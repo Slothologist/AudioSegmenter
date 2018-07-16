@@ -36,7 +36,7 @@ argv = iter(sys.argv)
 defaultclientname = os.path.splitext(os.path.basename(next(argv)))[0]
 clientname = next(argv, defaultclientname)
 servername = next(argv, None)
-path_to_config = next(argv, None)
+path_to_config = next(argv, './config/default.yaml')
 config_data = yaml.safe_load(open(path_to_config))
 
 db_min = int(config_data['db_min'])
