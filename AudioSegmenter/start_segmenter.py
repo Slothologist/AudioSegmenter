@@ -20,6 +20,8 @@ import signal
 import os
 import jack
 import threading
+import util
+import time
 
 if sys.version_info < (3, 0):
     # In Python 2.x, event.wait() cannot be interrupted with Ctrl+C.
@@ -44,7 +46,9 @@ db_keep_alive = int(config_data['db_keep_alive'])
 time_max = int(config_data['time_max'])
 time_keep_alive = int(config_data['time_keep_alive'])
 
-
+STATE = util.State.STANDBY
+last_keep_alive = None
+last_start = None
 
 client = jack.Client(clientname, servername=servername)
 
@@ -58,12 +62,30 @@ event = threading.Event()
 
 @client.set_process_callback
 def process(frames):
+    global last_start, last_keep_alive
     assert len(client.inports) == len(client.outports)
     assert frames == client.blocksize
     for i, o in zip(client.inports, client.outports):
-        #TODO stuff
-        o.get_buffer()[:] = i.get_buffer()
-
+        i_buffer = i.get_buffer()
+        frame_db = util.calc_db(i_buffer)
+        if last_keep_alive:
+            # segmentation in progress
+            if last_start + time_max > time.time():
+                # time run out
+                last_keep_alive = None
+            elif last_keep_alive + time_keep_alive > time.time() and frame_db < db_keep_alive:
+                # signal over
+                last_keep_alive = None
+            elif frame_db > db_keep_alive:
+                # signal loud enough
+                last_keep_alive = time.time()
+        else :
+            if frame_db > db_min:
+                # segmentation starting
+                last_keep_alive = time.time()
+                last_start = last_keep_alive
+        if last_keep_alive: # check again, may have changed
+            o.get_buffer()[:] = i_buffer
 
 @client.set_shutdown_callback
 def shutdown(status, reason):
