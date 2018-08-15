@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<package>
+  <name>audio_segmenter</name>
+  <version>0.0.1</version>
+  <description>package to segment audio via jack audio, with status reports via ros</description>
+
+  <maintainer email="rfeldh@gmail.com">Robert Feldhans</maintainer>
+  <license>---none---</license>
+  <author>rfeldhans</author>
+
+  <buildtool_depend>catkin</buildtool_depend>
+  <build_depend>roscpp</build_depend>
+
+  <run_depend>roscpp</run_depend>
+  <run_depend>package</run_depend>
+
+</package>

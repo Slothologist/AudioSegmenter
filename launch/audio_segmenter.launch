@@ -1,0 +1,4 @@
+<launch>
+    <arg name="path_to_config" />
+    <node name="audio_segmenter" pkg="audio_segmenter" type="audio_segmenter" output="screen" args="$(arg path_to_config)" />
+</launch>
