@@ -98,8 +98,8 @@ void jack_shutdown(void *arg) {
 
 int main(int argc, char *argv[]) {
     // parse config
-    config* cfg;
-    read_config(cfg, argv[1]);
+    config cfg;
+    read_config(&cfg, argv[1]);
 
 
     int i;
@@ -110,12 +110,12 @@ int main(int argc, char *argv[]) {
     jack_options_t options = JackNullOption;
     jack_status_t status;
 
-    if (argc >= 2)        /* client name specified? */
+    if (argc >= 3)        /* client name specified? */
     {
-        client_name = argv[1];
-        if (argc >= 3)    /* server name specified? */
+        client_name = argv[2];
+        if (argc >= 4)    /* server name specified? */
         {
-            server_name = argv[2];
+            server_name = argv[3];
             jack_server_name |= JackServerName;
             options = (jack_options_t) jack_server_name;
         }

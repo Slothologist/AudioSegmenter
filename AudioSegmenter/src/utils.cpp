@@ -16,9 +16,9 @@ void read_config(config* config, std::string config_file){
 
     boost::property_tree::ptree pt;
     boost::property_tree::ini_parser::read_ini(config_file, pt);
-    config->db_min = (double) pt.get<int>("Default.db_min");
-    config->db_keep_alive = (double) pt.get<int>("Default.db_keep_alive");
-    config->time_max = pt.get<int>("Default.time_max");
-    config->time_keep_alive = pt.get<int>("Default.time_keep_alive");
+    config->db_min = pt.get<double>("db_min");
+    config->db_keep_alive = pt.get<double>("db_keep_alive");
+    config->time_max = pt.get<int>("time_max");
+    config->time_keep_alive = pt.get<int>("time_keep_alive");
 }
 
