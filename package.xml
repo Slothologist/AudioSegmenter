@@ -10,8 +10,10 @@
 
   <buildtool_depend>catkin</buildtool_depend>
   <build_depend>roscpp</build_depend>
+  <build_depend>speech_rec_pipeline_msgs</build_depend>
 
   <run_depend>roscpp</run_depend>
   <run_depend>package</run_depend>
+  <run_depend>speech_rec_pipeline_msgs</run_depend>
 
 </package>

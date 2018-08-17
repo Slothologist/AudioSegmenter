@@ -7,7 +7,5 @@ Will read audio and write it back if...
    - The audio is not longer than time_max ms
 
 TODO's
-   - use only one channel for reading and writing
-   - publish ros messages for info
-      - start and end time of every segmented audio-scrap
-      - in additional thread, to not clutter jackaudio
+   - check for repeated audio-fragment after segemtnation is finished
+   - openmp the dB calculation in utils.cpp
