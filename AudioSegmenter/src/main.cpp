@@ -1,20 +1,20 @@
 /**
- * Taken mostly from https://github.com/jackaudio/jack2/blob/master/example-clients/thru_client.c
+ * Jackaudio part taken mostly from https://github.com/jackaudio/jack2/blob/master/example-clients/thru_client.c
  */
 
 #include <cstdio>
-#include <cerrno>
 #include <cstdlib>
-#include <cstring>
-#include <cmath>
 #include <csignal>
-#include <unistd.h>
 #include <jack/jack.h>
 #include <chrono>
 #include <thread>
 #include <boost/chrono/chrono.hpp>
-#include <iostream>
 
+// ros includes
+#include "ros/ros.h"
+#include "std_msgs/Float32.h"
+
+// inludes from this project
 #include "../include/utils.h"
 
 #define NOW boost::chrono::system_clock::now()
@@ -28,7 +28,7 @@ utils::config cfg;
 boost::chrono::system_clock::time_point last_start;
 boost::chrono::system_clock::time_point last_keep_alive;
 bool started_segmentation = false;
-double current_dB = 0.0;
+float current_dB = 0.0;
 
 static void signal_handler(int sig) {
     jack_client_close(client);
@@ -103,36 +103,26 @@ int main(int argc, char *argv[]) {
     // parse config
     read_config(&cfg, argv[1]);
 
+    // ros stuff
+    ros::init(argc, argv, cfg.ros_node_name);
+    ros::NodeHandle n;
+    ros::Publisher decibel_pub = n.advertise<std_msgs::Float32>(cfg.ros_decibel_publish_topic, 1);
 
+    // Jack stuff
     int i;
     auto jack_server_name = (int) JackNullOption;
     const char **ports;
-    const char *client_name;
-    const char *server_name = nullptr;
+    const char *client_name = cfg.jack_client_name;
+    const char *server_name = cfg.jack_server_name;
     jack_options_t options = JackNullOption;
     jack_status_t status;
 
-    if (argc >= 3)        /* client name specified? */
-    {
-        client_name = argv[2];
-        if (argc >= 4)    /* server name specified? */
-        {
-            server_name = argv[3];
-            jack_server_name |= JackServerName;
-            options = (jack_options_t) jack_server_name;
-        }
-    } else              /* use basename of argv[0] */
-    {
-        client_name = strrchr(argv[0], '/');
-        if (client_name == nullptr) {
-            client_name = argv[0];
-        } else {
-            client_name++;
-        }
+    if(server_name != nullptr){
+        jack_server_name |= JackServerName;
+        options = (jack_options_t) jack_server_name;
     }
 
     /* open a client connection to the JACK server */
-
     client = jack_client_open(client_name, options, &status, server_name);
     if (client == nullptr) {
         fprintf(stderr, "jack_client_open() failed, "
@@ -227,9 +217,13 @@ int main(int argc, char *argv[]) {
 
     /* keep running until the transport stops */
 
-    while (true) {
-        std::cout << current_dB << std::endl;
-        std::this_thread::sleep_for(std::chrono::milliseconds(cfg.publish_db_every_ms));
+    while (ros::ok()) {
+        std_msgs::Float32 dB_msg;
+        dB_msg.data = current_dB;
+        decibel_pub.publish(dB_msg);
+
+        //std::cout << current_dB << std::endl;
+        std::this_thread::sleep_for(std::chrono::milliseconds(cfg.ros_publish_db_interval));
     }
 
     jack_client_close(client);
