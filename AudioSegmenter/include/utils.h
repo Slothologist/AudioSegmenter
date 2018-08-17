@@ -7,14 +7,16 @@
 
 #include <jack/jack.h>
 #include <string>
+#include <boost/chrono/chrono.hpp>
 
 namespace utils{
 
     struct config{
         double db_min;
         double db_keep_alive;
-        int time_max;
-        int time_keep_alive;
+        boost::chrono::system_clock::duration time_max;
+        boost::chrono::system_clock::duration time_keep_alive;
+        int publish_db_every_ms;
     };
 
     /**

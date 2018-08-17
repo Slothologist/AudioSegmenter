@@ -10,7 +10,10 @@
 #include <csignal>
 #include <unistd.h>
 #include <jack/jack.h>
+#include <chrono>
+#include <thread>
 #include <boost/chrono/chrono.hpp>
+#include <iostream>
 
 #include "../include/utils.h"
 
@@ -20,14 +23,12 @@ jack_port_t **input_ports;
 jack_port_t **output_ports;
 jack_client_t *client;
 
-double db_min = 0.0;
-double db_keep_alive = 0.0;
-boost::chrono::system_clock::duration time_max;
-boost::chrono::system_clock::duration time_keep_alive;
+utils::config cfg;
 
 boost::chrono::system_clock::time_point last_start;
 boost::chrono::system_clock::time_point last_keep_alive;
 bool started_segmentation = false;
+double current_dB = 0.0;
 
 static void signal_handler(int sig) {
     jack_client_close(client);
@@ -50,15 +51,15 @@ int process(jack_nframes_t nframes, void *arg) {
         in = (jack_default_audio_sample_t *) jack_port_get_buffer(input_ports[i], nframes);
         out = (jack_default_audio_sample_t *) jack_port_get_buffer(output_ports[i], nframes);
 
-        double frame_db = utils::calculate_db(in, nframes);
+        current_dB = utils::calculate_db(in, nframes);
         if (started_segmentation) {
-            if (NOW - last_start > time_max) {
+            if (NOW - last_start > cfg.time_max) {
                 // max time reached
                 started_segmentation = false;
                 continue;
 
-            } else if (frame_db < db_keep_alive) {
-                if (NOW - last_keep_alive > time_keep_alive) {
+            } else if (current_dB < cfg.db_keep_alive) {
+                if (NOW - last_keep_alive > cfg.time_keep_alive) {
                     // signal not loud enough anymore
                     started_segmentation = false;
                     continue;
@@ -73,7 +74,7 @@ int process(jack_nframes_t nframes, void *arg) {
 
             }
 
-        } else if (frame_db >= db_min) {
+        } else if (current_dB >= cfg.db_min) {
             // segmentation starting
             last_start = NOW;
             last_keep_alive = last_start;
@@ -100,12 +101,7 @@ void jack_shutdown(void *arg) {
 
 int main(int argc, char *argv[]) {
     // parse config
-    utils::config cfg{};
     read_config(&cfg, argv[1]);
-    db_min = cfg.db_min;
-    db_keep_alive = cfg.db_keep_alive;
-    time_max = boost::chrono::milliseconds(cfg.time_max);
-    time_keep_alive = boost::chrono::milliseconds(cfg.time_keep_alive);
 
 
     int i;
@@ -232,7 +228,8 @@ int main(int argc, char *argv[]) {
     /* keep running until the transport stops */
 
     while (true) {
-        sleep(1);
+        std::cout << current_dB << std::endl;
+        std::this_thread::sleep_for(std::chrono::milliseconds(cfg.publish_db_every_ms));
     }
 
     jack_client_close(client);
