@@ -2,12 +2,12 @@
  * Taken mostly from https://github.com/jackaudio/jack2/blob/master/example-clients/thru_client.c
  */
 
-#include <stdio.h>
-#include <errno.h>
-#include <stdlib.h>
-#include <string.h>
-#include <math.h>
-#include <signal.h>
+#include <cstdio>
+#include <cerrno>
+#include <cstdlib>
+#include <cstring>
+#include <cmath>
+#include <csignal>
 #include <unistd.h>
 #include <jack/jack.h>
 #include <boost/chrono/chrono.hpp>
@@ -27,7 +27,7 @@ boost::chrono::system_clock::duration time_keep_alive;
 
 boost::chrono::system_clock::time_point last_start;
 boost::chrono::system_clock::time_point last_keep_alive;
-bool started_segmentation = false; //TODO: remove this by initialising last_{start, keep_alive} with null or something
+bool started_segmentation = false;
 
 static void signal_handler(int sig) {
     jack_client_close(client);
@@ -50,7 +50,7 @@ int process(jack_nframes_t nframes, void *arg) {
         in = (jack_default_audio_sample_t *) jack_port_get_buffer(input_ports[i], nframes);
         out = (jack_default_audio_sample_t *) jack_port_get_buffer(output_ports[i], nframes);
 
-        double frame_db = calculate_db(in);
+        double frame_db = utils::calculate_db(in, nframes);
         if (started_segmentation) {
             if (NOW - last_start > time_max) {
                 // max time reached
@@ -79,6 +79,8 @@ int process(jack_nframes_t nframes, void *arg) {
             last_keep_alive = last_start;
             started_segmentation = true;
 
+        } else {
+            continue;
         }
 
         memcpy(out, in, nframes * sizeof(jack_default_audio_sample_t));
@@ -98,15 +100,19 @@ void jack_shutdown(void *arg) {
 
 int main(int argc, char *argv[]) {
     // parse config
-    config cfg;
+    utils::config cfg{};
     read_config(&cfg, argv[1]);
+    db_min = cfg.db_min;
+    db_keep_alive = cfg.db_keep_alive;
+    time_max = boost::chrono::milliseconds(cfg.time_max);
+    time_keep_alive = boost::chrono::milliseconds(cfg.time_keep_alive);
 
 
     int i;
-    int jack_server_name = (int) JackNullOption;
+    auto jack_server_name = (int) JackNullOption;
     const char **ports;
     const char *client_name;
-    const char *server_name = NULL;
+    const char *server_name = nullptr;
     jack_options_t options = JackNullOption;
     jack_status_t status;
 
@@ -122,7 +128,7 @@ int main(int argc, char *argv[]) {
     } else              /* use basename of argv[0] */
     {
         client_name = strrchr(argv[0], '/');
-        if (client_name == 0) {
+        if (client_name == nullptr) {
             client_name = argv[0];
         } else {
             client_name++;
@@ -132,7 +138,7 @@ int main(int argc, char *argv[]) {
     /* open a client connection to the JACK server */
 
     client = jack_client_open(client_name, options, &status, server_name);
-    if (client == NULL) {
+    if (client == nullptr) {
         fprintf(stderr, "jack_client_open() failed, "
                         "status = 0x%2.0x\n", status);
         if (status & JackServerFailed) {
@@ -152,14 +158,14 @@ int main(int argc, char *argv[]) {
        there is work to be done.
     */
 
-    jack_set_process_callback(client, process, 0);
+    jack_set_process_callback(client, process, nullptr);
 
     /* tell the JACK server to call `jack_shutdown()' if
        it ever shuts down, either entirely, or if it
        just decides to stop calling us.
     */
 
-    jack_on_shutdown(client, jack_shutdown, 0);
+    jack_on_shutdown(client, jack_shutdown, nullptr);
 
     /* create two ports pairs*/
     input_ports = (jack_port_t **) calloc(2, sizeof(jack_port_t *));
@@ -171,7 +177,7 @@ int main(int argc, char *argv[]) {
         input_ports[i] = jack_port_register(client, port_name, JACK_DEFAULT_AUDIO_TYPE, JackPortIsInput, 0);
         sprintf(port_name, "output_%d", i + 1);
         output_ports[i] = jack_port_register(client, port_name, JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0);
-        if ((input_ports[i] == NULL) || (output_ports[i] == NULL)) {
+        if ((input_ports[i] == nullptr) || (output_ports[i] == nullptr)) {
             fprintf(stderr, "no more JACK ports available\n");
             exit(1);
         }
@@ -193,8 +199,8 @@ int main(int argc, char *argv[]) {
      * it.
      */
 
-    ports = jack_get_ports(client, NULL, NULL, JackPortIsPhysical | JackPortIsOutput);
-    if (ports == NULL) {
+    ports = jack_get_ports(client, nullptr, nullptr, JackPortIsPhysical | JackPortIsOutput);
+    if (ports == nullptr) {
         fprintf(stderr, "no physical capture ports\n");
         exit(1);
     }
@@ -205,8 +211,8 @@ int main(int argc, char *argv[]) {
 
     free(ports);
 
-    ports = jack_get_ports(client, NULL, NULL, JackPortIsPhysical | JackPortIsInput);
-    if (ports == NULL) {
+    ports = jack_get_ports(client, nullptr, nullptr, JackPortIsPhysical | JackPortIsInput);
+    if (ports == nullptr) {
         fprintf(stderr, "no physical playback ports\n");
         exit(1);
     }
@@ -225,7 +231,7 @@ int main(int argc, char *argv[]) {
 
     /* keep running until the transport stops */
 
-    while (1) {
+    while (true) {
         sleep(1);
     }
 
