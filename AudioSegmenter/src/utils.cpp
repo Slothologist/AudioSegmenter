@@ -4,6 +4,8 @@
 
 #include "../include/utils.h"
 #include <boost/property_tree/ptree.hpp>
+#include <boost/property_tree/ini_parser.hpp>
+#include <omp.h>
 
 #define MAX_DB 96
 
@@ -12,14 +14,21 @@ namespace utils {
 
 
     float calculate_db(jack_default_audio_sample_t *audio_sample, jack_nframes_t nframes) {
-        float max = 0.0;
+        float max_val = 0.0;
+        float min_val = 0.0;
+        #pragma omp parallel for reduction(max : max_val), reduction(min : min_val)
         for (int i = 0; i < nframes; i++) {
-            if(audio_sample[i * sizeof(jack_default_audio_sample_t)] > max)
-                max = audio_sample[i * sizeof(jack_default_audio_sample_t)];
-            else if ( -1 * audio_sample[i * sizeof(jack_default_audio_sample_t)] > max)
-                max = -1 * audio_sample[i * sizeof(jack_default_audio_sample_t)];
+            int index = i * sizeof(jack_default_audio_sample_t);
+            if(audio_sample[index] > max_val)
+                max_val = audio_sample[index];
+            else if (audio_sample[index] < min_val)
+                min_val = audio_sample[index];
         }
-        float dB = MAX_DB + 20 * log10(max);
+
+        if (-1*min_val > max_val){
+            max_val = -1*min_val;
+        }
+        float dB = MAX_DB + 20 * log10(max_val);
 
         return dB;
     }

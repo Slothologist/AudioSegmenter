@@ -8,4 +8,3 @@ Will read audio and write it back if...
 
 TODO's
    - check for repeated audio-fragment after segemtnation is finished
-   - openmp the dB calculation in utils.cpp

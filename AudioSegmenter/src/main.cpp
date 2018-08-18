@@ -126,10 +126,10 @@ int main(int argc, char *argv[]) {
     timeframe_pub = n.advertise<speech_rec_pipeline_msgs::SegmentedAudioTimeStamps>(cfg->ros_timestamp_publish_topic, 1);
     ros::ServiceServer change_config_service = n.advertiseService(cfg->ros_change_config_topic, change_config);
     ROS_INFO("Config:");
-    ROS_INFO("db_min = %f\n"
-             "db_keep_alive = %f\n"
-             "time_max = %f\n"
-             "time_keep_alive = %f", cfg->db_min, cfg->db_keep_alive, (double)cfg->time_max.toNSec(), (double)cfg->time_keep_alive.toNSec());
+    ROS_INFO("db_min = %.2f\n"
+             "db_keep_alive = %.2f\n"
+             "time_max = %.2f\n"
+             "time_keep_alive = %.2f", cfg->db_min, cfg->db_keep_alive, (double)cfg->time_max.toNSec()/1000000, (double)cfg->time_keep_alive.toNSec()/1000000);
 
     // Jack stuff
     auto jack_server_name = (int) JackNullOption;
