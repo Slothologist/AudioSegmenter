@@ -9,4 +9,4 @@ Will read audio and write it back if...
 Check out the parent repository for more ros audio nodes: https://github.com/Slothologist/SpeechRecPipeLine
 
 TODO's
-   - check for repeated audio-fragment after segemtnation is finished
+   - check for repeated audio-fragment after segmentation is finished
