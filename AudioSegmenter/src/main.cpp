@@ -122,8 +122,8 @@ int main(int argc, char *argv[]) {
     // ros stuff
     ros::init(argc, argv, cfg->ros_node_name);
     ros::NodeHandle n;
-    ros::Publisher decibel_pub = n.advertise<std_msgs::Float32>(cfg->ros_decibel_publish_topic, 1);
-    timeframe_pub = n.advertise<speech_rec_pipeline_msgs::SegmentedAudioTimeStamps>(cfg->ros_timestamp_publish_topic, 1);
+    ros::Publisher decibel_pub = n.advertise<std_msgs::Float32>(cfg->ros_decibel_publish_topic, 1, true);
+    timeframe_pub = n.advertise<speech_rec_pipeline_msgs::SegmentedAudioTimeStamps>(cfg->ros_timestamp_publish_topic, 1, true);
     ros::ServiceServer change_config_service = n.advertiseService(cfg->ros_change_config_topic, change_config);
     ROS_INFO("Config:");
     ROS_INFO("db_min = %.2f\n"
