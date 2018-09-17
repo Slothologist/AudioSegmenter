@@ -5,7 +5,6 @@
 #include "../include/utils.h"
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/ini_parser.hpp>
-#include <omp.h>
 
 #define MAX_DB 96
 
@@ -14,6 +13,7 @@ namespace utils {
 
 
     float calculate_db(jack_default_audio_sample_t *audio_sample, jack_nframes_t nframes) {
+        // find maximum value using OpenMp
         float max_val = 0.0;
         float min_val = 0.0;
         #pragma omp parallel for reduction(max : max_val), reduction(min : min_val)
@@ -28,6 +28,8 @@ namespace utils {
         if (-1*min_val > max_val){
             max_val = -1*min_val;
         }
+
+        // calculate decibel as found somewhere on stackoverflow
         float dB = MAX_DB + 20 * log10(max_val);
 
         return dB;
