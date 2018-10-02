@@ -4,7 +4,6 @@
 
 #include <cstdio>
 #include <cstdlib>
-#include <csignal>
 #include <jack/jack.h>
 #include <boost/thread.hpp>
 
@@ -16,6 +15,8 @@
 
 // inludes from this project
 #include "../include/utils.h"
+#include "../include/base_segmenter.h"
+#include "../include/double_threshold_segmenter.h"
 
 
 jack_port_t *input_port;
@@ -23,17 +24,14 @@ jack_port_t *output_port;
 jack_client_t *client;
 
 utils::config* cfg;
+segmenter::BaseSegmenter* sgmntr;
 
-ros::Time last_start;
-ros::Time last_keep_alive;
 ros::Publisher timeframe_pub;
-bool started_segmentation = false;
 float current_dB = 0.0;
 
 static void signal_handler(int sig) {
     jack_client_close(client);
-    fprintf(stderr, "signal received, exiting ...\n");
-    exit(0);
+    ROS_ERROR("signal received, exiting ...");
 }
 
 /**
@@ -45,53 +43,27 @@ static void signal_handler(int sig) {
  */
 
 
-void publish_segmented_timesteps(ros::Time start, ros::Time finish, ros::Publisher* publisher) {
+void publish_segmented_timesteps(ros::Time start, ros::Publisher* publisher) {
     ROS_INFO("Segmentation took place!");
     speech_rec_pipeline_msgs::SegmentedAudioTimeStamps msg;
     msg.start = start;
-    msg.finish = finish;
+    msg.finish = ros::Time::now();
     publisher->publish(msg);
 }
 
 int process(jack_nframes_t nframes, void *arg) {
-    bool segmentation_finished = false;
     jack_default_audio_sample_t *in, *out;
     in = (jack_default_audio_sample_t *) jack_port_get_buffer(input_port, nframes);
     out = (jack_default_audio_sample_t *) jack_port_get_buffer(output_port, nframes);
-    ros::Time now = ros::Time::now();
-
     current_dB = utils::calculate_db(in, nframes);
-    if (started_segmentation) {
-        if (current_dB > cfg->db_keep_alive) {
-            if (now - last_start > cfg->time_max) {
-                // max time reached
-                started_segmentation = false;
-                segmentation_finished = true;
-            } else {
-                last_keep_alive = now;
-            }
-        } else {
-            if (now - last_start > cfg->time_max) {
-                // max time reached
-                started_segmentation = false;
-                segmentation_finished = true;
-            } else if (now - last_keep_alive > cfg->time_keep_alive) {
-                // signal not loud enough anymore
-                started_segmentation = false;
-                segmentation_finished = true;
-            }
-        }
-    } else if(current_dB > cfg->db_min){
-        started_segmentation = true;
-        last_keep_alive = now;
-        last_start = now;
-    }
 
+    segmenter::BaseSegmenter::SegmentationStatus status;
+    sgmntr->segment(in, nframes, status);
 
-    if (started_segmentation) {
+    if (status == segmenter::BaseSegmenter::SegmentationStatus::started) {
         memcpy(out, in, nframes * sizeof(jack_default_audio_sample_t));
-    } else if (segmentation_finished){
-        boost::thread publisher_thread(publish_segmented_timesteps, last_start, now, &timeframe_pub);
+    } else if (status == segmenter::BaseSegmenter::SegmentationStatus::finished){
+        boost::thread publisher_thread(publish_segmented_timesteps, sgmntr->get_last_started(), &timeframe_pub);
     }
 
     return 0;
@@ -118,6 +90,7 @@ int main(int argc, char *argv[]) {
     // parse config
     cfg = new utils::config();
     read_config(cfg, argv[1]);
+    sgmntr = new segmenter::DoubleThresholdSegmenter(cfg);
 
     // ros stuff
     ros::init(argc, argv, cfg->ros_node_name);
@@ -147,19 +120,19 @@ int main(int argc, char *argv[]) {
     /* open a client connection to the JACK server */
     client = jack_client_open(client_name, options, &status, server_name);
     if (client == nullptr) {
-        fprintf(stderr, "jack_client_open() failed, "
-                        "status = 0x%2.0x\n", status);
+        ROS_ERROR("jack_client_open() failed, "
+                        "status = 0x%2.0x", status);
         if (status & JackServerFailed) {
-            fprintf(stderr, "Unable to connect to JACK server\n");
+            ROS_ERROR("Unable to connect to JACK server");
         }
         exit(1);
     }
     if (status & JackServerStarted) {
-        fprintf(stderr, "JACK server started\n");
+        ROS_ERROR("JACK server started");
     }
     if (status & JackNameNotUnique) {
         client_name = jack_get_client_name(client);
-        fprintf(stderr, "unique name `%s' assigned\n", client_name);
+        ROS_ERROR("unique name `%s' assigned", client_name);
     }
 
     /* tell the JACK server to call `process()' whenever
@@ -175,13 +148,10 @@ int main(int argc, char *argv[]) {
 
     jack_on_shutdown(client, jack_shutdown, nullptr);
 
-    char port_name[16];
-    sprintf(port_name, "input_%d", 1);
-    input_port = jack_port_register(client, port_name, JACK_DEFAULT_AUDIO_TYPE, JackPortIsInput, 0);
-    sprintf(port_name, "output_%d", 1);
-    output_port = jack_port_register(client, port_name, JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0);
+    input_port = jack_port_register(client, cfg->jack_input_port_name, JACK_DEFAULT_AUDIO_TYPE, JackPortIsInput, 0);
+    output_port = jack_port_register(client, cfg->jack_output_port_name, JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0);
     if ((input_port == nullptr) || (output_port == nullptr)) {
-        fprintf(stderr, "no more JACK ports available\n");
+        ROS_ERROR("no more JACK ports available");
         exit(1);
     }
 
@@ -189,7 +159,7 @@ int main(int argc, char *argv[]) {
      * process() callback will start running now. */
 
     if (jack_activate(client)) {
-        fprintf(stderr, "cannot activate client");
+        ROS_ERROR("cannot activate client");
         exit(1);
     }
 
@@ -203,31 +173,26 @@ int main(int argc, char *argv[]) {
 
     ports = jack_get_ports(client, nullptr, nullptr, JackPortIsPhysical | JackPortIsOutput);
     if (ports == nullptr) {
-        fprintf(stderr, "no physical capture ports\n");
+        ROS_ERROR("no physical capture ports");
         exit(1);
     }
 
     if (jack_connect(client, ports[0], jack_port_name(input_port)))
-        fprintf(stderr, "cannot connect input ports\n");
+        ROS_ERROR("cannot connect input ports");
 
     free(ports);
 
     ports = jack_get_ports(client, nullptr, nullptr, JackPortIsPhysical | JackPortIsInput);
     if (ports == nullptr) {
-        fprintf(stderr, "no physical playback ports\n");
+        ROS_ERROR( "no physical playback ports");
         exit(1);
     }
 
     if (jack_connect(client, jack_port_name(output_port), ports[0]))
-        fprintf(stderr, "cannot connect input ports\n");
+        ROS_ERROR( "cannot connect input ports");
 
     free(ports);
 
-    /* install a signal handler to properly quits jack client */
-    signal(SIGQUIT, signal_handler);
-    signal(SIGTERM, signal_handler);
-    signal(SIGHUP, signal_handler);
-    signal(SIGINT, signal_handler);
 
     /* keep running until the transport stops */
     ROS_INFO("Node ready and rockin'");

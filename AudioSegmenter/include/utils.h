@@ -23,6 +23,8 @@ namespace utils{
         std::string ros_change_config_topic;
         const char* jack_client_name;
         const char* jack_server_name = nullptr;
+        const char* jack_input_port_name;
+        const char* jack_output_port_name;
     };
 
     /**
