@@ -23,7 +23,7 @@ jack_port_t *input_port;
 jack_port_t *output_port;
 jack_client_t *client;
 
-utils::config* cfg;
+utils::config cfg;
 segmenter::BaseSegmenter* sgmntr;
 
 ros::Publisher timeframe_pub;
@@ -79,36 +79,35 @@ void jack_shutdown(void *arg) {
 
 bool change_config(speech_rec_pipeline_msgs::SegmenterConfig::Request &req,
                    speech_rec_pipeline_msgs::SegmenterConfig::Response &res) {
-    cfg->db_min = req.db_min;
-    cfg->db_keep_alive = req.db_keep_alive;
-    cfg->time_max = ros::Duration(((double)req.time_max)/1000);
-    cfg->time_keep_alive = ros::Duration(((double)req.time_keep_alive)/1000);
+    cfg.db_min = req.db_min;
+    cfg.db_keep_alive = req.db_keep_alive;
+    cfg.time_max = ros::Duration(((double)req.time_max)/1000);
+    cfg.time_keep_alive = ros::Duration(((double)req.time_keep_alive)/1000);
     return true;
 }
 
 int main(int argc, char *argv[]) {
     // parse config
-    cfg = new utils::config();
     read_config(cfg, argv[1]);
-    sgmntr = new segmenter::DoubleThresholdSegmenter(cfg);
+    sgmntr = new segmenter::DoubleThresholdSegmenter(&cfg);
 
     // ros stuff
-    ros::init(argc, argv, cfg->ros_node_name);
+    ros::init(argc, argv, cfg.ros_node_name);
     ros::NodeHandle n;
-    ros::Publisher decibel_pub = n.advertise<std_msgs::Float32>(cfg->ros_decibel_publish_topic, 1, true);
-    timeframe_pub = n.advertise<speech_rec_pipeline_msgs::SegmentedAudioTimeStamps>(cfg->ros_timestamp_publish_topic, 1, true);
-    ros::ServiceServer change_config_service = n.advertiseService(cfg->ros_change_config_topic, change_config);
+    ros::Publisher decibel_pub = n.advertise<std_msgs::Float32>(cfg.ros_decibel_publish_topic, 1, true);
+    timeframe_pub = n.advertise<speech_rec_pipeline_msgs::SegmentedAudioTimeStamps>(cfg.ros_timestamp_publish_topic, 1, true);
+    ros::ServiceServer change_config_service = n.advertiseService(cfg.ros_change_config_topic, change_config);
     ROS_INFO("Config:");
-    ROS_INFO("db_min = %.2f\n"
-             "db_keep_alive = %.2f\n"
-             "time_max = %.2f\n"
-             "time_keep_alive = %.2f", cfg->db_min, cfg->db_keep_alive, (double)cfg->time_max.toNSec()/1000000, (double)cfg->time_keep_alive.toNSec()/1000000);
+    ROS_INFO("db_min = %.2f", cfg.db_min );
+    ROS_INFO("db_keep_alive = %.2f", cfg.db_keep_alive);
+    ROS_INFO("time_max = %.2f", (double)cfg.time_max.toNSec()/1000000);
+    ROS_INFO("time_keep_alive = %.2f" , (double)cfg.time_keep_alive.toNSec()/1000000);
 
     // Jack stuff
     auto jack_server_name = (int) JackNullOption;
     const char **ports;
-    const char *client_name = cfg->jack_client_name;
-    const char *server_name = cfg->jack_server_name;
+    const char *client_name = cfg.jack_client_name.c_str();
+    const char *server_name = cfg.jack_server_name == "default" ? nullptr : cfg.jack_server_name.c_str();
     jack_options_t options = JackNullOption;
     jack_status_t status;
 
@@ -128,7 +127,7 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
     if (status & JackServerStarted) {
-        ROS_ERROR("JACK server started");
+        ROS_INFO("JACK server started");
     }
     if (status & JackNameNotUnique) {
         client_name = jack_get_client_name(client);
@@ -147,9 +146,8 @@ int main(int argc, char *argv[]) {
     */
 
     jack_on_shutdown(client, jack_shutdown, nullptr);
-
-    input_port = jack_port_register(client, cfg->jack_input_port_name, JACK_DEFAULT_AUDIO_TYPE, JackPortIsInput, 0);
-    output_port = jack_port_register(client, cfg->jack_output_port_name, JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0);
+    input_port = jack_port_register(client, cfg.jack_input_port_name.c_str(), JACK_DEFAULT_AUDIO_TYPE, JackPortIsInput, 0);
+    output_port = jack_port_register(client, cfg.jack_output_port_name.c_str(), JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0);
     if ((input_port == nullptr) || (output_port == nullptr)) {
         ROS_ERROR("no more JACK ports available");
         exit(1);
@@ -202,7 +200,7 @@ int main(int argc, char *argv[]) {
         dB_msg.data = current_dB;
         decibel_pub.publish(dB_msg);
 
-        cfg->ros_publish_db_interval.sleep();
+        cfg.ros_publish_db_interval.sleep();
     }
 
     jack_client_close(client);

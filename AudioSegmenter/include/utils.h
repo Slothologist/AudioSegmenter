@@ -21,10 +21,10 @@ namespace utils{
         std::string ros_decibel_publish_topic;
         std::string ros_timestamp_publish_topic;
         std::string ros_change_config_topic;
-        const char* jack_client_name;
-        const char* jack_server_name = nullptr;
-        const char* jack_input_port_name;
-        const char* jack_output_port_name;
+        std::string jack_client_name;
+        std::string jack_server_name;
+        std::string jack_input_port_name;
+        std::string jack_output_port_name;
     };
 
     /**
@@ -34,7 +34,7 @@ namespace utils{
      */
     float calculate_db(jack_default_audio_sample_t* audio_sample, jack_nframes_t nframes);
 
-    void read_config(config* config, std::string config_file);
+    void read_config(config& config, std::string config_file);
 
 }
 

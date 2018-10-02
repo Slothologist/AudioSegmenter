@@ -11,6 +11,7 @@ namespace segmenter{
     {
 
         started_segmentation = false;
+        segmentation_finished = false;
     }
 
     void DoubleThresholdSegmenter::segment(jack_default_audio_sample_t* sample,
@@ -49,6 +50,7 @@ namespace segmenter{
             status = BaseSegmenter::SegmentationStatus::started;
         } else if (segmentation_finished){
             status = BaseSegmenter::SegmentationStatus::finished;
+            segmentation_finished = false;
         } else {
             status = BaseSegmenter::SegmentationStatus::idle;
         }
