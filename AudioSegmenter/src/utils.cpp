@@ -18,11 +18,10 @@ namespace utils {
         float min_val = 0.0;
         #pragma omp parallel for reduction(max : max_val), reduction(min : min_val)
         for (int i = 0; i < nframes; i++) {
-            int index = i * sizeof(jack_default_audio_sample_t);
-            if(audio_sample[index] > max_val)
-                max_val = audio_sample[index];
-            else if (audio_sample[index] < min_val)
-                min_val = audio_sample[index];
+            if(audio_sample[i] > max_val)
+                max_val = audio_sample[i];
+            else if (audio_sample[i] < min_val)
+                min_val = audio_sample[i];
         }
 
         if (-1*min_val > max_val){

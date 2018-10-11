@@ -29,10 +29,6 @@ segmenter::BaseSegmenter* sgmntr;
 ros::Publisher timeframe_pub;
 float current_dB = 0.0;
 
-static void signal_handler(int sig) {
-    jack_client_close(client);
-    ROS_ERROR("signal received, exiting ...");
-}
 
 /**
  * The process callback for this JACK application is called in a
@@ -62,9 +58,13 @@ int process(jack_nframes_t nframes, void *arg) {
 
     if (status == segmenter::BaseSegmenter::SegmentationStatus::started) {
         memcpy(out, in, nframes * sizeof(jack_default_audio_sample_t));
+        return 0;
     } else if (status == segmenter::BaseSegmenter::SegmentationStatus::finished){
         boost::thread publisher_thread(publish_segmented_timesteps, sgmntr->get_last_started(), &timeframe_pub);
     }
+    // set out to zero
+    float* nullarray = new float[nframes]();
+    memcpy(out, nullarray, nframes * sizeof(jack_default_audio_sample_t));
 
     return 0;
 }
