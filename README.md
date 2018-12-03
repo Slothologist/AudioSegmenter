@@ -24,3 +24,6 @@ Otherwise, it will output a zero signal.
 - Jack audio
 
 - Somewhat recent gcc (5.4 is tested, but it should theoretically work from 4.8 onwards)
+
+- SpeechRecPipelineMsgs (https://github.com/Slothologist/SpeechRecPipelineMsgs)
+
