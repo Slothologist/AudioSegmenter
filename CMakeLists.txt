@@ -95,6 +95,8 @@ catkin_package(
 include_directories(
         ${catkin_INCLUDE_DIRS}
 )
+message("include dirs:")
+message(${catkin_INCLUDE_DIRS})
 
 ## Declare a C++ library
 # add_library(audio_segmenter
