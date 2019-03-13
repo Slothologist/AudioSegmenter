@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <package>
   <name>audio_segmenter</name>
-  <version>0.0.1</version>
-  <description>package to segment audio via jack audio, with status reports via ros</description>
+  <version>0.0.2</version>
+  <description>package to segment audio via esiaf_ros, with status reports via ros</description>
 
   <maintainer email="rfeldh@gmail.com">Robert Feldhans</maintainer>
   <license>---none---</license>
@@ -10,10 +10,10 @@
 
   <buildtool_depend>catkin</buildtool_depend>
   <build_depend>roscpp</build_depend>
-  <build_depend>speech_rec_pipeline_msgs</build_depend>
+  <build_depend>esiaf_ros</build_depend>
 
   <run_depend>roscpp</run_depend>
   <run_depend>package</run_depend>
-  <run_depend>speech_rec_pipeline_msgs</run_depend>
+  <run_depend>esiaf_ros</run_depend>
 
 </package>

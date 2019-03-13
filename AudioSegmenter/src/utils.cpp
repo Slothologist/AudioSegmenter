@@ -12,8 +12,8 @@
 namespace utils {
 
 
-    float calculate_db(jack_default_audio_sample_t *audio_sample, jack_nframes_t nframes) {
-        // find maximum value using OpenMp
+    float calculate_db(float* audio_sample, size_t nframes) {
+        // find maximum absolute value using OpenMp
         float max_val = 0.0;
         float min_val = 0.0;
         #pragma omp parallel for reduction(max : max_val), reduction(min : min_val)
@@ -41,15 +41,14 @@ namespace utils {
         config.db_keep_alive = pt.get<double>("db_keep_alive");
         config.time_max = ros::Duration(pt.get<double>("time_max")/1000);
         config.time_keep_alive = ros::Duration(pt.get<double>("time_keep_alive")/1000);
+        config.esiaf_input_topic = pt.get<std::string>("esiaf_input_topic");
+        config.esiaf_output_topic = pt.get<std::string>("esiaf_output_topic");
+
         config.ros_node_name = pt.get<std::string>("ros_node_name");
         config.ros_publish_db_interval = ros::Duration(pt.get<double>("ros_publish_db_interval")/1000);
         config.ros_decibel_publish_topic = pt.get<std::string>("ros_decibel_publish_topic");
         config.ros_timestamp_publish_topic = pt.get<std::string>("ros_timestamp_publish_topic");
         config.ros_change_config_topic = pt.get<std::string>("ros_change_config_topic");
-        config.jack_client_name = pt.get<std::string>("jack_client_name");
-        config.jack_server_name = pt.get<std::string>("jack_server_name");
-        config.jack_input_port_name = pt.get<std::string>("jack_input_port_name");
-        config.jack_output_port_name = pt.get<std::string>("jack_output_port_name");
     }
 
 }

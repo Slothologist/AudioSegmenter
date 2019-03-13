@@ -14,8 +14,8 @@ namespace segmenter{
         segmentation_finished = false;
     }
 
-    void DoubleThresholdSegmenter::segment(jack_default_audio_sample_t* sample,
-                                           jack_nframes_t frame_count,
+    void DoubleThresholdSegmenter::segment(float* sample,
+                                           size_t frame_count,
                                            SegmentationStatus& status) {
         ros::Time now = ros::Time::now();
 

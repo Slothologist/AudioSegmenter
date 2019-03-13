@@ -14,7 +14,7 @@ namespace segmenter{
 
         explicit DoubleThresholdSegmenter(utils::config* cfg);
 
-        void segment(jack_default_audio_sample_t*, jack_nframes_t, SegmentationStatus&);
+        void segment(float*, size_t, SegmentationStatus&);
 
         ros::Time get_last_started();
 

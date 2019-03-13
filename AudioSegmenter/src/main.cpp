@@ -1,17 +1,9 @@
-/**
- * Jackaudio part taken mostly from https://github.com/jackaudio/jack2/blob/master/example-clients/thru_client.c
- */
 
-#include <cstdio>
-#include <cstdlib>
-#include <jack/jack.h>
-#include <boost/thread.hpp>
+#include <esiaf_ros.h>
 
 // ros includes
 #include "ros/ros.h"
 #include "std_msgs/Float32.h"
-#include "speech_rec_pipeline_msgs/SegmenterConfig.h"
-#include "speech_rec_pipeline_msgs/SegmentedAudioTimeStamps.h"
 
 // inludes from this project
 #include "../include/utils.h"
@@ -19,9 +11,8 @@
 #include "../include/double_threshold_segmenter.h"
 
 
-jack_port_t *input_port;
-jack_port_t *output_port;
-jack_client_t *client;
+boost::function<void(const std::vector<int8_t> &, const esiaf_ros::RecordingTimeStamps &)> simple_esiaf_callback;
+void esiaf_handler(const std::vector<int8_t> &signal, const esiaf_ros::RecordingTimeStamps & timeStamps){ simple_esiaf_callback(signal, timeStamps); };
 
 utils::config cfg;
 segmenter::BaseSegmenter* sgmntr;
@@ -30,52 +21,7 @@ ros::Publisher timeframe_pub;
 float current_dB = 0.0;
 
 
-/**
- * The process callback for this JACK application is called in a
- * special realtime thread once for each audio cycle.
- *
- * This client follows a simple rule: when the JACK transport is
- * running, copy the input port to the output.  When it stops, exit.
- */
-
-
-void publish_segmented_timesteps(ros::Time start, ros::Publisher* publisher) {
-    ROS_INFO("Segmentation took place!");
-    speech_rec_pipeline_msgs::SegmentedAudioTimeStamps msg;
-    msg.start = start;
-    msg.finish = ros::Time::now();
-    publisher->publish(msg);
-}
-
-int process(jack_nframes_t nframes, void *arg) {
-    jack_default_audio_sample_t *in, *out;
-    in = (jack_default_audio_sample_t *) jack_port_get_buffer(input_port, nframes);
-    out = (jack_default_audio_sample_t *) jack_port_get_buffer(output_port, nframes);
-    current_dB = utils::calculate_db(in, nframes);
-
-    segmenter::BaseSegmenter::SegmentationStatus status;
-    sgmntr->segment(in, nframes, status);
-
-    if (status == segmenter::BaseSegmenter::SegmentationStatus::started) {
-        memcpy(out, in, nframes * sizeof(jack_default_audio_sample_t));
-        return 0;
-    } else if (status == segmenter::BaseSegmenter::SegmentationStatus::finished){
-        boost::thread publisher_thread(publish_segmented_timesteps, sgmntr->get_last_started(), &timeframe_pub);
-    }
-    // set out to zero
-    float* nullarray = new float[nframes]();
-    memcpy(out, nullarray, nframes * sizeof(jack_default_audio_sample_t));
-
-    return 0;
-}
-
-/**
- * JACK calls this shutdown_callback if the server ever shuts down or
- * decides to disconnect the client.
- */
-void jack_shutdown(void *arg) {
-    exit(1);
-}
+/*
 
 bool change_config(speech_rec_pipeline_msgs::SegmenterConfig::Request &req,
                    speech_rec_pipeline_msgs::SegmenterConfig::Response &res) {
@@ -85,124 +31,108 @@ bool change_config(speech_rec_pipeline_msgs::SegmenterConfig::Request &req,
     cfg.time_keep_alive = ros::Duration(((double)req.time_keep_alive)/1000);
     return true;
 }
+ */
 
 int main(int argc, char *argv[]) {
     // parse config
     read_config(cfg, argv[1]);
     sgmntr = new segmenter::DoubleThresholdSegmenter(&cfg);
 
-    // ros stuff
+    // ros initialization
     ros::init(argc, argv, cfg.ros_node_name);
     ros::NodeHandle n;
+
+
+    //////////////////////////////////////////////////////
+    // esiaf start
+    //////////////////////////////////////////////////////
+
+    // initialise esiaf
+    ROS_INFO("starting esiaf initialisation...");
+    esiaf_ros::esiaf_handle *eh = esiaf_ros::initialize_esiaf(&n, esiaf_ros::NodeDesignation::VAD);
+
+    //create format for input topic
+    esiaf_ros::EsiafAudioTopicInfo inputTopicInfo;
+
+    esiaf_ros::EsiafAudioFormat allowedFormat;
+    allowedFormat.rate = esiaf_ros::Rate::RATE_48000;
+    allowedFormat.channels = 1;
+    allowedFormat.bitrate = esiaf_ros::Bitrate::BIT_FLOAT_32;
+    allowedFormat.endian = esiaf_ros::Endian::LittleEndian;
+
+    inputTopicInfo.allowedFormat = allowedFormat;
+    inputTopicInfo.topic = cfg.esiaf_input_topic;
+
+    // create format for output topic
+    esiaf_ros::EsiafAudioTopicInfo outputTopicInfo = inputTopicInfo;
+    outputTopicInfo.topic = cfg.esiaf_output_topic;
+
+    // notify esiaf about the input topic
+
+    int sampleSizeFactor = sizeof(int8_t) / sizeof(float);
+
+    // here we will segment the audio we acquire from esiaf
+    simple_esiaf_callback = [&](const std::vector<int8_t> &signal,
+                                const esiaf_ros::RecordingTimeStamps &timeStamps){
+
+        size_t amountFloatFrames = sampleSizeFactor * signal.size();
+        float *floatSignal;
+        current_dB = utils::calculate_db((float*) signal.data(), amountFloatFrames);
+
+        segmenter::BaseSegmenter::SegmentationStatus status;
+        sgmntr->segment(floatSignal, amountFloatFrames, status);
+
+
+        switch (status) {
+            case segmenter::BaseSegmenter::SegmentationStatus::finished:
+            case segmenter::BaseSegmenter::SegmentationStatus::started:
+                esiaf_ros::publish(eh, outputTopicInfo.topic, signal, timeStamps);
+                break;
+            case segmenter::BaseSegmenter::SegmentationStatus::idle:
+                break;
+        }
+    };
+
+    // add input topic
+    esiaf_ros::add_input_topic(eh, inputTopicInfo, esiaf_handler);
+
+    // notify esiaf about the output topic
+    ROS_INFO("adding output topic....");
+
+    // add output topic
+    esiaf_ros::add_output_topic(eh, outputTopicInfo);
+
+    // start esiaf
+    ROS_INFO("starting esiaf...");
+
+    esiaf_ros::start_esiaf(eh);
+
+    //////////////////////////////////////////////////////
+    // esiaf initialisation finished
+    //////////////////////////////////////////////////////
+
+
     ros::Publisher decibel_pub = n.advertise<std_msgs::Float32>(cfg.ros_decibel_publish_topic, 1, true);
-    timeframe_pub = n.advertise<speech_rec_pipeline_msgs::SegmentedAudioTimeStamps>(cfg.ros_timestamp_publish_topic, 1, true);
-    ros::ServiceServer change_config_service = n.advertiseService(cfg.ros_change_config_topic, change_config);
+    //timeframe_pub = n.advertise<speech_rec_pipeline_msgs::SegmentedAudioTimeStamps>(cfg.ros_timestamp_publish_topic, 1, true);
+    //ros::ServiceServer change_config_service = n.advertiseService(cfg.ros_change_config_topic, change_config);
     ROS_INFO("Config:");
     ROS_INFO("db_min = %.2f", cfg.db_min );
     ROS_INFO("db_keep_alive = %.2f", cfg.db_keep_alive);
     ROS_INFO("time_max = %.2f", (double)cfg.time_max.toNSec()/1000000);
     ROS_INFO("time_keep_alive = %.2f" , (double)cfg.time_keep_alive.toNSec()/1000000);
 
-    // Jack stuff
-    auto jack_server_name = (int) JackNullOption;
-    const char **ports;
-    const char *client_name = cfg.jack_client_name.c_str();
-    const char *server_name = cfg.jack_server_name == "default" ? nullptr : cfg.jack_server_name.c_str();
-    jack_options_t options = JackNullOption;
-    jack_status_t status;
 
-    if (server_name != nullptr) {
-        jack_server_name |= JackServerName;
-        options = (jack_options_t) jack_server_name;
-    }
-
-    /* open a client connection to the JACK server */
-    client = jack_client_open(client_name, options, &status, server_name);
-    if (client == nullptr) {
-        ROS_ERROR("jack_client_open() failed, "
-                        "status = 0x%2.0x", status);
-        if (status & JackServerFailed) {
-            ROS_ERROR("Unable to connect to JACK server");
-        }
-        exit(1);
-    }
-    if (status & JackServerStarted) {
-        ROS_INFO("JACK server started");
-    }
-    if (status & JackNameNotUnique) {
-        client_name = jack_get_client_name(client);
-        ROS_ERROR("unique name `%s' assigned", client_name);
-    }
-
-    /* tell the JACK server to call `process()' whenever
-       there is work to be done.
-    */
-
-    jack_set_process_callback(client, process, nullptr);
-
-    /* tell the JACK server to call `jack_shutdown()' if
-       it ever shuts down, either entirely, or if it
-       just decides to stop calling us.
-    */
-
-    jack_on_shutdown(client, jack_shutdown, nullptr);
-    input_port = jack_port_register(client, cfg.jack_input_port_name.c_str(), JACK_DEFAULT_AUDIO_TYPE, JackPortIsInput, 0);
-    output_port = jack_port_register(client, cfg.jack_output_port_name.c_str(), JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0);
-    if ((input_port == nullptr) || (output_port == nullptr)) {
-        ROS_ERROR("no more JACK ports available");
-        exit(1);
-    }
-
-    /* Tell the JACK server that we are ready to roll.  Our
-     * process() callback will start running now. */
-
-    if (jack_activate(client)) {
-        ROS_ERROR("cannot activate client");
-        exit(1);
-    }
-
-    /* Connect the ports.  You can't do this before the client is
-     * activated, because we can't make connections to clients
-     * that aren't running.  Note the confusing (but necessary)
-     * orientation of the driver backend ports: playback ports are
-     * "input" to the backend, and capture ports are "output" from
-     * it.
-     */
-
-    ports = jack_get_ports(client, nullptr, nullptr, JackPortIsPhysical | JackPortIsOutput);
-    if (ports == nullptr) {
-        ROS_ERROR("no physical capture ports");
-        exit(1);
-    }
-
-    if (jack_connect(client, ports[0], jack_port_name(input_port)))
-        ROS_ERROR("cannot connect input ports");
-
-    free(ports);
-
-    ports = jack_get_ports(client, nullptr, nullptr, JackPortIsPhysical | JackPortIsInput);
-    if (ports == nullptr) {
-        ROS_ERROR( "no physical playback ports");
-        exit(1);
-    }
-
-    if (jack_connect(client, jack_port_name(output_port), ports[0]))
-        ROS_ERROR( "cannot connect input ports");
-
-    free(ports);
-
-
-    /* keep running until the transport stops */
     ROS_INFO("Node ready and rockin'");
 
+    ros::spin();
+    /*
     while (ros::ok()) {
         std_msgs::Float32 dB_msg;
         dB_msg.data = current_dB;
         decibel_pub.publish(dB_msg);
 
         cfg.ros_publish_db_interval.sleep();
-    }
+    }*/
 
-    jack_client_close(client);
     exit(0);
 }

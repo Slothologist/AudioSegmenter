@@ -9,7 +9,7 @@ add_definitions(-std=c++11)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED
         roscpp
-        speech_rec_pipeline_msgs
+        esiaf_ros
         )
 
 
@@ -82,7 +82,7 @@ set (CMAKE_CXX_FLAGS "-fopenmp -O2")
 catkin_package(
         INCLUDE_DIRS AudioSegmenter/include
         #  LIBRARIES audio_segmenter_lib
-        #  DEPENDS jack
+        CATKIN_DEPENDS esiaf_ros
 )
 
 ###########
@@ -120,7 +120,6 @@ add_dependencies(audio_segmenter ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EX
 ## Specify libraries to link a library or executable target against
 target_link_libraries(audio_segmenter
         ${catkin_LIBRARIES}
-        jack
         )
 
 #############
