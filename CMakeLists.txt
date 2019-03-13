@@ -8,8 +8,8 @@ add_definitions(-std=c++11)
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED
-        roscpp
         COMPONENTS
+        roscpp
         esiaf_ros
         )
 
@@ -95,9 +95,11 @@ catkin_package(
 ## Your package locations should be listed before other locations
 include_directories(
         ${catkin_INCLUDE_DIRS}
+        ${esiaf_ros_INCLUDE_DIRS}
 )
 message("include dirs:")
 message(${catkin_INCLUDE_DIRS})
+message(${esiaf_ros_INCLUDE_DIRS})
 
 ## Declare a C++ library
 # add_library(audio_segmenter
