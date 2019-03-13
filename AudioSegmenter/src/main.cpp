@@ -1,4 +1,4 @@
-
+// esiaf include
 #include <esiaf_ros.h>
 
 // ros includes
@@ -10,6 +10,9 @@
 #include "../include/base_segmenter.h"
 #include "../include/double_threshold_segmenter.h"
 
+// std includes
+#include <mutex>
+
 
 boost::function<void(const std::vector<int8_t> &, const esiaf_ros::RecordingTimeStamps &)> simple_esiaf_callback;
 void esiaf_handler(const std::vector<int8_t> &signal, const esiaf_ros::RecordingTimeStamps & timeStamps){ simple_esiaf_callback(signal, timeStamps); };
@@ -17,21 +20,8 @@ void esiaf_handler(const std::vector<int8_t> &signal, const esiaf_ros::Recording
 utils::config cfg;
 segmenter::BaseSegmenter* sgmntr;
 
-ros::Publisher timeframe_pub;
 float current_dB = 0.0;
-
-
-/*
-
-bool change_config(speech_rec_pipeline_msgs::SegmenterConfig::Request &req,
-                   speech_rec_pipeline_msgs::SegmenterConfig::Response &res) {
-    cfg.db_min = req.db_min;
-    cfg.db_keep_alive = req.db_keep_alive;
-    cfg.time_max = ros::Duration(((double)req.time_max)/1000);
-    cfg.time_keep_alive = ros::Duration(((double)req.time_keep_alive)/1000);
-    return true;
-}
- */
+std::mutex db_mutex;
 
 int main(int argc, char *argv[]) {
     // parse config
@@ -77,7 +67,9 @@ int main(int argc, char *argv[]) {
 
         size_t amountFloatFrames = sampleSizeFactor * signal.size();
         float *floatSignal;
+        db_mutex.lock();
         current_dB = utils::calculate_db((float*) signal.data(), amountFloatFrames);
+        db_mutex.unlock();
 
         segmenter::BaseSegmenter::SegmentationStatus status;
         sgmntr->segment(floatSignal, amountFloatFrames, status);
@@ -85,6 +77,7 @@ int main(int argc, char *argv[]) {
 
         switch (status) {
             case segmenter::BaseSegmenter::SegmentationStatus::finished:
+                // add signal for finished segmentation
             case segmenter::BaseSegmenter::SegmentationStatus::started:
                 esiaf_ros::publish(eh, outputTopicInfo.topic, signal, timeStamps);
                 break;
@@ -113,8 +106,6 @@ int main(int argc, char *argv[]) {
 
 
     ros::Publisher decibel_pub = n.advertise<std_msgs::Float32>(cfg.ros_decibel_publish_topic, 1, true);
-    //timeframe_pub = n.advertise<speech_rec_pipeline_msgs::SegmentedAudioTimeStamps>(cfg.ros_timestamp_publish_topic, 1, true);
-    //ros::ServiceServer change_config_service = n.advertiseService(cfg.ros_change_config_topic, change_config);
     ROS_INFO("Config:");
     ROS_INFO("db_min = %.2f", cfg.db_min );
     ROS_INFO("db_keep_alive = %.2f", cfg.db_keep_alive);
@@ -124,15 +115,16 @@ int main(int argc, char *argv[]) {
 
     ROS_INFO("Node ready and rockin'");
 
-    ros::spin();
-    /*
     while (ros::ok()) {
         std_msgs::Float32 dB_msg;
+        db_mutex.lock();
         dB_msg.data = current_dB;
+        db_mutex.unlock();
         decibel_pub.publish(dB_msg);
 
         cfg.ros_publish_db_interval.sleep();
-    }*/
+        ros::spinOnce();
+    }
 
     exit(0);
 }
