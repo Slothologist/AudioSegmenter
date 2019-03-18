@@ -76,9 +76,11 @@ int main(int argc, char *argv[]) {
 
 
         switch (status) {
-            case segmenter::BaseSegmenter::SegmentationStatus::finished:
-                // add signal for finished segmentation
             case segmenter::BaseSegmenter::SegmentationStatus::started:
+                esiaf_ros::publish(eh, outputTopicInfo.topic, signal, timeStamps);
+                break;
+            case segmenter::BaseSegmenter::SegmentationStatus::finished:
+                esiaf_ros::set_vad_finished(eh, outputTopicInfo.topic);
                 esiaf_ros::publish(eh, outputTopicInfo.topic, signal, timeStamps);
                 break;
             case segmenter::BaseSegmenter::SegmentationStatus::idle:
