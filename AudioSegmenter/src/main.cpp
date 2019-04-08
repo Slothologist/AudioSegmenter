@@ -58,17 +58,16 @@ int main(int argc, char *argv[]) {
     outputTopicInfo.topic = cfg.esiaf_output_topic;
 
     // notify esiaf about the input topic
-
-    int sampleSizeFactor = sizeof(int8_t) / sizeof(float);
-
+    
     // here we will segment the audio we acquire from esiaf
     simple_esiaf_callback = [&](const std::vector<int8_t> &signal,
                                 const esiaf_ros::RecordingTimeStamps &timeStamps){
 
-        size_t amountFloatFrames = sampleSizeFactor * signal.size();
-        float *floatSignal;
+        size_t amountFloatFrames = signal.size()/(sizeof(float)/sizeof(int8_t));
+        float *floatSignal = (float*) signal.data();
         db_mutex.lock();
-        current_dB = utils::calculate_db((float*) signal.data(), amountFloatFrames);
+        current_dB = utils::calculate_db(floatSignal, amountFloatFrames);
+        ROS_INFO("frames: %ld, decibel: %f", amountFloatFrames, current_dB);
         db_mutex.unlock();
 
         segmenter::BaseSegmenter::SegmentationStatus status;
@@ -128,5 +127,6 @@ int main(int argc, char *argv[]) {
         ros::spinOnce();
     }
 
+    esiaf_ros::quit_esiaf(eh);
     exit(0);
 }
