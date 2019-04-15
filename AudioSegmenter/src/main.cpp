@@ -39,7 +39,8 @@ int main(int argc, char *argv[]) {
 
     // initialise esiaf
     ROS_INFO("starting esiaf initialisation...");
-    esiaf_ros::esiaf_handle *eh = esiaf_ros::initialize_esiaf(&n, esiaf_ros::NodeDesignation::VAD);
+    esiaf_ros::Esiaf_Handler handler;
+    handler.initialize_esiaf(&n, esiaf_ros::NodeDesignation::VAD);
 
     //create format for input topic
     esiaf_ros::EsiafAudioTopicInfo inputTopicInfo;
@@ -76,11 +77,11 @@ int main(int argc, char *argv[]) {
 
         switch (status) {
             case segmenter::BaseSegmenter::SegmentationStatus::started:
-                esiaf_ros::publish(eh, outputTopicInfo.topic, signal, timeStamps);
+                handler.publish(outputTopicInfo.topic, signal, timeStamps);
                 break;
             case segmenter::BaseSegmenter::SegmentationStatus::finished:
-                esiaf_ros::set_vad_finished(eh, outputTopicInfo.topic);
-                esiaf_ros::publish(eh, outputTopicInfo.topic, signal, timeStamps);
+                handler.set_vad_finished(outputTopicInfo.topic);
+                handler.publish(outputTopicInfo.topic, signal, timeStamps);
                 break;
             case segmenter::BaseSegmenter::SegmentationStatus::idle:
                 break;
@@ -88,18 +89,18 @@ int main(int argc, char *argv[]) {
     };
 
     // add input topic
-    esiaf_ros::add_input_topic(eh, inputTopicInfo, esiaf_handler);
+    handler.add_input_topic(inputTopicInfo, esiaf_handler);
 
     // notify esiaf about the output topic
     ROS_INFO("adding output topic....");
 
     // add output topic
-    esiaf_ros::add_output_topic(eh, outputTopicInfo);
+    handler.add_output_topic(outputTopicInfo);
 
     // start esiaf
     ROS_INFO("starting esiaf...");
 
-    esiaf_ros::start_esiaf(eh);
+    handler.start_esiaf();
 
     //////////////////////////////////////////////////////
     // esiaf initialisation finished
@@ -127,6 +128,6 @@ int main(int argc, char *argv[]) {
         ros::spinOnce();
     }
 
-    esiaf_ros::quit_esiaf(eh);
+    handler.quit_esiaf();
     exit(0);
 }
