@@ -39,8 +39,7 @@ int main(int argc, char *argv[]) {
 
     // initialise esiaf
     ROS_INFO("starting esiaf initialisation...");
-    esiaf_ros::Esiaf_Handler handler;
-    handler.initialize_esiaf(&n, esiaf_ros::NodeDesignation::VAD);
+    esiaf_ros::Esiaf_Handler handler(&n, esiaf_ros::NodeDesignation::VAD);
 
     //create format for input topic
     esiaf_ros::EsiafAudioTopicInfo inputTopicInfo;
