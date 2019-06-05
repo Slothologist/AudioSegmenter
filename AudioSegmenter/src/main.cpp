@@ -45,7 +45,7 @@ int main(int argc, char *argv[]) {
     esiaf_ros::EsiafAudioTopicInfo inputTopicInfo;
 
     esiaf_ros::EsiafAudioFormat allowedFormat;
-    allowedFormat.rate = esiaf_ros::Rate::RATE_48000;
+    allowedFormat.rate = esiaf_ros::Rate::RATE_16000;
     allowedFormat.channels = 1;
     allowedFormat.bitrate = esiaf_ros::Bitrate::BIT_FLOAT_32;
     allowedFormat.endian = esiaf_ros::Endian::LittleEndian;
@@ -81,6 +81,7 @@ int main(int argc, char *argv[]) {
             case segmenter::BaseSegmenter::SegmentationStatus::finished:
                 handler.set_vad_finished(outputTopicInfo.topic);
                 handler.publish(outputTopicInfo.topic, signal, timeStamps);
+                ROS_INFO("segmentation has finished!");
                 break;
             case segmenter::BaseSegmenter::SegmentationStatus::idle:
                 break;
