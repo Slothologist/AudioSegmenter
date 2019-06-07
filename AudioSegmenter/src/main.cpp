@@ -129,5 +129,6 @@ int main(int argc, char *argv[]) {
     }
 
     handler.quit_esiaf();
+    delete sgmntr;
     exit(0);
 }
