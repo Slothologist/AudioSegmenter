@@ -5,7 +5,6 @@
 #ifndef AUDIO_SEGMENTER_UTILS_H
 #define AUDIO_SEGMENTER_UTILS_H
 
-#include <jack/jack.h>
 #include <string>
 #include "ros/ros.h"
 
