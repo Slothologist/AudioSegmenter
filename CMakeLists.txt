@@ -15,7 +15,7 @@ find_package(catkin REQUIRED
 
 
 ## Set compiler flags
-set (CMAKE_CXX_FLAGS "-fopenmp -O2")
+set (CMAKE_CXX_FLAGS "-O2")
 
 
 ################################################

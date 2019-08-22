@@ -16,7 +16,6 @@ namespace utils {
         // find maximum absolute value using OpenMp
         float max_val = 0.0;
         float min_val = 0.0;
-        #pragma omp parallel for reduction(max : max_val), reduction(min : min_val)
         for (int i = 0; i < nframes; i++) {
             if(audio_sample[i] > max_val)
                 max_val = audio_sample[i];
